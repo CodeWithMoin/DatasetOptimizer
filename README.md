@@ -15,6 +15,6 @@
 To get started with DatasetOptimizer, clone this repository and install the required packages:
 
 ```bash
-git clone https://github.com/<your-username>/DatasetOptimizer.git
+git clone https://github.com/CodeWithMoin/DatasetOptimizer.git
 cd DatasetOptimizer
 pip install -r requirements.txt
