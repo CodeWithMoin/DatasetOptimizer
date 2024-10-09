@@ -39,8 +39,8 @@ def save_image_in_formats(image, output_folder, filename, format='webp', quality
 def process_images(image_dir, output_dir, target_size, output_format, rotation_angle=None, scale_factor=None):
     images = load_images(image_dir)
     
-    for img_path in images:
-        img = cv2.imread(img_path)
+    for img, img_path in images:  # Correct unpacking
+        img = cv2.imread(os.path.join(image_dir, img_path))  # Read image correctly
 
         # Apply affine transformations if specified
         if rotation_angle is not None:
@@ -50,7 +50,7 @@ def process_images(image_dir, output_dir, target_size, output_format, rotation_a
 
         # Resize the image to the target size
         img_resized = cv2.resize(img, target_size)
-        
+
         # Save the processed image
         base_name = os.path.basename(img_path)
         output_path = os.path.join(output_dir, f"{os.path.splitext(base_name)[0]}.{output_format}")
@@ -81,8 +81,8 @@ def batch_process_images(image_dir, output_dir, batch_size=10, target_size=(256,
     for i in range(num_batches):
         batch_images = images[i * batch_size:(i + 1) * batch_size]
         
-        for img_path in batch_images:
-            img = cv2.imread(img_path)
+        for img, img_path in batch_images:  # Correct unpacking
+            img = cv2.imread(os.path.join(image_dir, img_path))  # Read image correctly
             img_resized = cv2.resize(img, target_size)
             base_name = os.path.basename(img_path)
             output_path = os.path.join(output_dir, f"{os.path.splitext(base_name)[0]}.{output_format}")
@@ -90,21 +90,57 @@ def batch_process_images(image_dir, output_dir, batch_size=10, target_size=(256,
 
         print(f'Processed batch {i + 1}/{num_batches}')
 
-def process_single_image(img_path, output_dir, target_size, output_format):
+def process_single_image(img_path, output_dir, target_size, output_format, rotate=None, scale=None):
+    # Read the image using OpenCV (this returns a NumPy array)
     img = cv2.imread(img_path)
-    img_resized = cv2.resize(img, target_size)
+
+    if img is None:
+        print(f"Error: Unable to load image {img_path}")
+        return
+
+    # Apply rotation if specified
+    if rotate is not None:
+        img = rotate_image(img, rotate)
+
+    # Apply scaling if specified
+    if scale is not None:
+        img = scale_image(img, scale)
+
+    # Resize the image without borders
+    img_resized = resize_image_opencv(img, target_size)
+
+    # Construct output path and save the image in the desired format
     base_name = os.path.basename(img_path)
     output_path = os.path.join(output_dir, f"{os.path.splitext(base_name)[0]}.{output_format}")
     cv2.imwrite(output_path, img_resized)
+    print(f"Saved image: {output_path}")
 
-def parallel_process_images(image_dir, output_dir, target_size=(256, 256), output_format='png', max_workers=4):
+def parallel_process_images(image_dir, output_dir, target_size=(256, 256), output_format='png', rotate=None, scale=None, workers=4):
     images = load_images(image_dir)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         futures = []
-        for img_path in images:
-            futures.append(executor.submit(process_single_image, img_path, output_dir, target_size, output_format))
+        for img, img_filename in images:  # Correct unpacking here
+            img_path = os.path.join(image_dir, img_filename)
+            futures.append(executor.submit(process_single_image, img_path, output_dir, target_size, output_format, rotate, scale))
         
         # Wait for all futures to complete
         for future in concurrent.futures.as_completed(futures):
             future.result()  # Get the result to raise exceptions if any
+
+def resize_image_opencv(image, target_size):
+    """Resize an OpenCV image while maintaining the aspect ratio without adding borders."""
+    original_height, original_width = image.shape[:2]
+    target_width, target_height = target_size
+
+    # Calculate the scaling factor to maintain the aspect ratio
+    aspect_ratio = min(target_width / original_width, target_height / original_height)
+
+    # Calculate the new dimensions based on the aspect ratio
+    new_width = int(original_width * aspect_ratio)
+    new_height = int(original_height * aspect_ratio)
+
+    # Resize the image to the new dimensions
+    resized_image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4)
+
+    return resized_image
