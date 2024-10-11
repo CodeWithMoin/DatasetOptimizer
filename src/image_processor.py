@@ -129,18 +129,26 @@ def parallel_process_images(image_dir, output_dir, target_size=(256, 256), outpu
             future.result()  # Get the result to raise exceptions if any
 
 def resize_image_opencv(image, target_size):
-    """Resize an OpenCV image while maintaining the aspect ratio without adding borders."""
+    """Resize an OpenCV image while maintaining the aspect ratio."""
     original_height, original_width = image.shape[:2]
     target_width, target_height = target_size
 
-    # Calculate the scaling factor to maintain the aspect ratio
+    # Calculate the aspect ratio for scaling
     aspect_ratio = min(target_width / original_width, target_height / original_height)
 
-    # Calculate the new dimensions based on the aspect ratio
+    # Calculate new dimensions based on the aspect ratio
     new_width = int(original_width * aspect_ratio)
     new_height = int(original_height * aspect_ratio)
 
-    # Resize the image to the new dimensions
+    # Resize the image
     resized_image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4)
+
+    # If you want exact target size, create a canvas and paste the resized image in the center
+    if (new_width, new_height) != (target_width, target_height):
+        canvas = np.ones((target_height, target_width, 3), dtype=np.uint8) * 255  # White canvas
+        x_offset = (target_width - new_width) // 2
+        y_offset = (target_height - new_height) // 2
+        canvas[y_offset:y_offset + new_height, x_offset:x_offset + new_width] = resized_image
+        resized_image = canvas
 
     return resized_image
