@@ -12,6 +12,7 @@ if __name__ == "__main__":
     parser.add_argument('--rotate', type=float, default=0.0, help='Rotation angle in degrees.')
     parser.add_argument('--scale', type=float, default=1.0, help='Scale factor (e.g., 1.0 for no scaling).')
     parser.add_argument('--workers', type=int, default=4, help='Number of parallel workers.')
+    parser.add_argument('--quality', type=int, default=85, help='Quality level for output images (1-100).')
 
     args = parser.parse_args()
 
@@ -19,5 +20,4 @@ if __name__ == "__main__":
     width, height = map(int, args.resize.split('x'))
     target_size = (width, height)
 
-    # Run the image processing
-    parallel_process_images(args.input_dir, args.output_dir, target_size, args.format, args.rotate, args.scale, args.workers)
+    parallel_process_images(args.input_dir, args.output_dir, target_size, args.format, args.rotate, args.scale, args.workers, args.quality)

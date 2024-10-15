@@ -23,8 +23,11 @@ def resize_image(image, target_size):
 
 def save_image_in_formats(image, output_folder, filename, format='webp', quality=85):
     """Save the image in the specified format."""
+    if isinstance(image, np.ndarray):  # Check if image is a NumPy array
+        image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))  # Convert BGR to RGB
+
     output_path = os.path.join(output_folder, f"{os.path.splitext(filename)[0]}.{format}")
-    
+
     if format.lower() == 'webp':
         image.save(output_path, 'webp', quality=quality)
     elif format.lower() == 'png':
@@ -36,7 +39,8 @@ def save_image_in_formats(image, output_folder, filename, format='webp', quality
 
     print(f"Saved image: {output_path}")
 
-def process_images(image_dir, output_dir, target_size, output_format, rotation_angle=None, scale_factor=None):
+
+def process_images(image_dir, output_dir, target_size, output_format, quality=85, rotation_angle=None, scale_factor=None):
     images = load_images(image_dir)
     
     for img, img_path in images:  # Correct unpacking
@@ -51,11 +55,8 @@ def process_images(image_dir, output_dir, target_size, output_format, rotation_a
         # Resize the image to the target size
         img_resized = cv2.resize(img, target_size)
 
-        # Save the processed image
         base_name = os.path.basename(img_path)
-        output_path = os.path.join(output_dir, f"{os.path.splitext(base_name)[0]}.{output_format}")
-        cv2.imwrite(output_path, img_resized)
-        print(f"Saved image: {output_path}")
+        save_image_in_formats(Image.fromarray(img_resized), output_dir, base_name, output_format, quality)
 
 
 def rotate_image(image, angle):
@@ -90,7 +91,7 @@ def batch_process_images(image_dir, output_dir, batch_size=10, target_size=(256,
 
         print(f'Processed batch {i + 1}/{num_batches}')
 
-def process_single_image(img_path, output_dir, target_size, output_format, rotate=None, scale=None):
+def process_single_image(img_path, output_dir, target_size, output_format, rotate=None, scale=None, quality=85):
     # Read the image using OpenCV (this returns a NumPy array)
     img = cv2.imread(img_path)
 
@@ -112,22 +113,22 @@ def process_single_image(img_path, output_dir, target_size, output_format, rotat
     # Construct output path and save the image in the desired format
     base_name = os.path.basename(img_path)
     output_path = os.path.join(output_dir, f"{os.path.splitext(base_name)[0]}.{output_format}")
-    cv2.imwrite(output_path, img_resized)
-    print(f"Saved image: {output_path}")
+    save_image_in_formats(img_resized, output_dir, base_name, format=output_format, quality=quality)  # Pass quality here
 
-def parallel_process_images(image_dir, output_dir, target_size=(256, 256), output_format='png', rotate=None, scale=None, workers=4):
+def parallel_process_images(image_dir, output_dir, target_size=(256, 256), output_format='png', rotate=None, scale=None, workers=4, quality=85):
     images = load_images(image_dir)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         futures = []
         for img, img_filename in images:  # Correct unpacking here
             img_path = os.path.join(image_dir, img_filename)
-            futures.append(executor.submit(process_single_image, img_path, output_dir, target_size, output_format, rotate, scale))
+            futures.append(executor.submit(process_single_image, img_path, output_dir, target_size, output_format, rotate, scale, quality))
         
         # Wait for all futures to complete
         for future in concurrent.futures.as_completed(futures):
             future.result()  # Get the result to raise exceptions if any
 
+'''
 def resize_image_opencv(image, target_size):
     """Resize an OpenCV image while maintaining the aspect ratio."""
     original_height, original_width = image.shape[:2]
@@ -150,5 +151,22 @@ def resize_image_opencv(image, target_size):
         y_offset = (target_height - new_height) // 2
         canvas[y_offset:y_offset + new_height, x_offset:x_offset + new_width] = resized_image
         resized_image = canvas
+
+    return resized_image
+'''
+def resize_image_opencv(image, target_size):
+    """Resize an OpenCV image while maintaining the aspect ratio."""
+    original_height, original_width = image.shape[:2]
+    target_width, target_height = target_size
+
+    # Calculate the aspect ratio for scaling
+    aspect_ratio = min(target_width / original_width, target_height / original_height)
+
+    # Calculate new dimensions based on the aspect ratio
+    new_width = int(original_width * aspect_ratio)
+    new_height = int(original_height * aspect_ratio)
+
+    # Resize the image
+    resized_image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4)
 
     return resized_image
